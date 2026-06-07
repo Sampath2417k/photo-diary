@@ -109,10 +109,9 @@
   </div>
 
   <script>
-    const SUPABASE_URL = 'https://juwqrdmilbbrpoqoggmh.supabase.co';
+    const SUPABASE_URL = 'https://juwqrdmilbbrpoqoggmh.sb.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1d3FyZG1pbGJicnBvcW9nZ21oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NTYyMjEsImV4cCI6MjA5NjQzMjIyMX0.izRotsz2UCoBUhiDklnDOpIlYTdd_6NbGN_DexjOGNs';
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('Supabase initialized');
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentUser = null;
     let currentRole = 'nothing';
@@ -137,7 +136,7 @@
       const password = document.getElementById('reg-password').value;
       console.log('Signing up:', email);
       if (!email || !password) return alert('Enter email and password');
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await sb.auth.signUp({ email, password });
       console.log('Sign up result:', data, error);
       if (error) return alert('Error: ' + error.message);
       alert('Signed up! Now sign in with the same credentials.');
@@ -147,24 +146,24 @@
     async function signIn() {
       const email = document.getElementById('login-email').value;
       const password = document.getElementById('login-password').value;
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) return document.getElementById('auth-error').textContent = error.message;
       await loadUser();
     }
 
     async function signOut() {
-      await supabase.auth.signOut();
+      await sb.auth.signOut();
       location.reload();
     }
 
     async function loadUser() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await sb.auth.getUser();
       if (!user) return;
       currentUser = user;
       // Check profile for role
-      let { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      let { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single();
       if (!profile) {
-        await supabase.from('profiles').insert({ id: user.id, email: user.email, role: 'nothing' });
+        await sb.from('profiles').insert({ id: user.id, email: user.email, role: 'nothing' });
         currentRole = 'nothing';
       } else {
         currentRole = profile.role;
@@ -197,11 +196,11 @@
       const path = currentUser.id + '/' + Date.now() + '.' + ext;
 
       document.getElementById('upload-status').textContent = 'Uploading...';
-      const { error: uploadError } = await supabase.storage.from('photos').upload(path, file);
+      const { error: uploadError } = await sb.storage.from('photos').upload(path, file);
       if (uploadError) return document.getElementById('upload-status').textContent = 'Upload error: ' + uploadError.message;
 
-      const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(path);
-      const { error: dbError } = await supabase.from('photos').insert({
+      const { data: { publicUrl } } = sb.storage.from('photos').getPublicUrl(path);
+      const { error: dbError } = await sb.from('photos').insert({
         url: publicUrl,
         caption: caption,
         uploaded_by: currentUser.id,
@@ -216,7 +215,7 @@
 
     async function loadPhotos() {
       document.getElementById('loading-text').classList.remove('hidden');
-      let query = supabase.from('photos').select('*, profiles!inner(email, role)').order('created_at', { ascending: false });
+      let query = sb.from('photos').select('*, profiles!inner(email, role)').order('created_at', { ascending: false });
       if (currentFilter !== 'all') {
         query = query.eq('visibility', currentFilter);
       } else {
@@ -239,7 +238,7 @@
     }
 
     // Check session on load
-    supabase.auth.onAuthStateChange((event, session) => {
+    sb.auth.onAuthStateChange((event, session) => {
       if (session) loadUser();
     });
     loadUser();
