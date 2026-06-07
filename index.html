@@ -110,8 +110,9 @@
 
   <script>
     const SUPABASE_URL = 'https://juwqrdmilbbrpoqoggmh.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_T6SgPYXvCnJtXNMRlmlBOA_cr9r3jMe';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1d3FyZG1pbGJicnBvcW9nZ21oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NTYyMjEsImV4cCI6MjA5NjQzMjIyMX0.izRotsz2UCoBUhiDklnDOpIlYTdd_6NbGN_DexjOGNs';
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('Supabase initialized');
 
     let currentUser = null;
     let currentRole = 'nothing';
@@ -134,9 +135,13 @@
     async function signUp() {
       const email = document.getElementById('reg-email').value;
       const password = document.getElementById('reg-password').value;
+      console.log('Signing up:', email);
+      if (!email || !password) return alert('Enter email and password');
       const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) return alert(error.message);
-      alert('Signed up! Wait for admin to assign your role.');
+      console.log('Sign up result:', data, error);
+      if (error) return alert('Error: ' + error.message);
+      alert('Signed up! Now sign in with the same credentials.');
+      switchAuthTab('login');
     }
 
     async function signIn() {
