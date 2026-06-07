@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photo Diary</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #eee; min-height: 100vh; }
+    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .hidden { display: none !important; }
+    h1 { text-align: center; margin: 20px 0; font-size: 1.8rem; }
+    .card { background: #1a1a2e; border-radius: 12px; padding: 24px; margin: 16px 0; }
+    input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: none; font-size: 1rem; }
+    input { background: #16213e; color: #eee; }
+    input:focus { outline: 2px solid #0f3460; }
+    button { background: #0f3460; color: #eee; cursor: pointer; font-weight: 600; }
+    button:hover { background: #1a5276; }
+    .btn-danger { background: #6b0f1a; }
+    .btn-danger:hover { background: #8b1525; }
+    .btn-success { background: #1b6b1b; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; margin-top: 16px; }
+    .photo-card { background: #1a1a2e; border-radius: 12px; overflow: hidden; }
+    .photo-card img { width: 100%; height: 200px; object-fit: cover; }
+    .photo-card .caption { padding: 12px; font-size: 0.9rem; color: #aaa; }
+    .photo-card .meta { padding: 0 12px 12px; font-size: 0.75rem; color: #666; }
+    .navbar { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: #1a1a2e; }
+    .navbar .role-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; }
+    .role-god { background: #b8860b; color: #000; }
+    .role-friend { background: #2e7d32; color: #fff; }
+    .role-nothing { background: #555; color: #fff; }
+    select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: none; background: #16213e; color: #eee; font-size: 1rem; }
+    textarea { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: none; background: #16213e; color: #eee; font-family: inherit; resize: vertical; }
+    .tab-bar { display: flex; gap: 8px; margin: 16px 0; }
+    .tab { flex: 1; text-align: center; padding: 10px; border-radius: 8px; background: #1a1a2e; cursor: pointer; }
+    .tab.active { background: #0f3460; }
+    .filter-bar { display: flex; gap: 8px; margin: 12px 0; }
+    .filter-btn { flex: 1; text-align: center; padding: 8px; border-radius: 20px; background: transparent; border: 1px solid #333; cursor: pointer; font-size: 0.85rem; }
+    .filter-btn.active { background: #0f3460; border-color: #0f3460; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Login -->
+    <div id="auth-section" class="container" style="max-width:400px;margin-top:80px">
+      <div class="card">
+        <h2 style="text-align:center;margin-bottom:16px">Photo Diary</h2>
+        <div class="tab-bar">
+          <div class="tab active" onclick="switchAuthTab('login')">Sign In</div>
+          <div class="tab" onclick="switchAuthTab('register')">Sign Up</div>
+        </div>
+        <div id="login-form">
+          <input type="email" id="login-email" placeholder="Email" />
+          <input type="password" id="login-password" placeholder="Password" />
+          <button onclick="signIn()">Sign In</button>
+          <p id="auth-error" style="color:#e74c3c;font-size:0.85rem;margin-top:8px"></p>
+        </div>
+        <div id="register-form" class="hidden">
+          <input type="email" id="reg-email" placeholder="Email" />
+          <input type="password" id="reg-password" placeholder="Password (min 6 chars)" />
+          <button onclick="signUp()">Sign Up</button>
+        </div>
+      </div>
+      <p style="text-align:center;font-size:0.8rem;color:#666">Wait for admin to assign your role after sign up</p>
+    </div>
+
+    <!-- Main App -->
+    <div id="main-section" class="hidden">
+      <div class="navbar">
+        <span><strong>Photo Diary</strong></span>
+        <span>
+          <span id="role-badge" class="role-badge"></span>
+          <button onclick="signOut()" style="width:auto;padding:6px 16px;margin-left:12px;font-size:0.8rem" class="btn-danger">Sign Out</button>
+        </span>
+      </div>
+
+      <div class="container">
+        <div class="tab-bar">
+          <div class="tab active" onclick="switchMainTab('gallery')">Gallery</div>
+          <div class="tab" onclick="switchMainTab('upload')">Upload</div>
+        </div>
+
+        <!-- Gallery -->
+        <div id="gallery-tab">
+          <div class="filter-bar" id="filter-bar"></div>
+          <div id="photo-grid" class="grid"></div>
+          <p id="loading-text" style="text-align:center;color:#666;margin-top:40px">Loading photos...</p>
+        </div>
+
+        <!-- Upload -->
+        <div id="upload-tab" class="hidden">
+          <div class="card">
+            <h3>Upload Photo</h3>
+            <input type="file" id="photo-input" accept="image/*" />
+            <input type="text" id="caption-input" placeholder="Caption / diary entry" />
+            <label style="font-size:0.85rem;color:#aaa">Visible to:</label>
+            <select id="visibility-select">
+              <option value="god">God only</option>
+              <option value="friend">Friend & God</option>
+              <option value="nothing">Everyone (public)</option>
+            </select>
+            <button onclick="uploadPhoto()">Upload</button>
+            <p id="upload-status" style="font-size:0.85rem;margin-top:8px"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://juwqrdmilbbrpoqoggmh.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_T6SgPYXvCnJtXNMRlmlBOA_cr9r3jMe';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentUser = null;
+    let currentRole = 'nothing';
+
+    // Auth tabs
+    function switchAuthTab(tab) {
+      document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+      document.querySelectorAll('#auth-section .tab').forEach(t => t.classList.toggle('active', t.textContent.includes(tab === 'login' ? 'Sign In' : 'Sign Up')));
+    }
+
+    function switchMainTab(tab) {
+      document.getElementById('gallery-tab').classList.toggle('hidden', tab !== 'gallery');
+      document.getElementById('upload-tab').classList.toggle('hidden', tab !== 'upload');
+      document.querySelectorAll('#main-section .tab').forEach(t => t.classList.toggle('active', t.textContent.includes(tab === 'gallery' ? 'Gallery' : 'Upload')));
+      if (tab === 'gallery') loadPhotos();
+    }
+
+    // Auth
+    async function signUp() {
+      const email = document.getElementById('reg-email').value;
+      const password = document.getElementById('reg-password').value;
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) return alert(error.message);
+      alert('Signed up! Wait for admin to assign your role.');
+    }
+
+    async function signIn() {
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return document.getElementById('auth-error').textContent = error.message;
+      await loadUser();
+    }
+
+    async function signOut() {
+      await supabase.auth.signOut();
+      location.reload();
+    }
+
+    async function loadUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      currentUser = user;
+      // Check profile for role
+      let { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      if (!profile) {
+        await supabase.from('profiles').insert({ id: user.id, email: user.email, role: 'nothing' });
+        currentRole = 'nothing';
+      } else {
+        currentRole = profile.role;
+      }
+      document.getElementById('auth-section').classList.add('hidden');
+      document.getElementById('main-section').classList.remove('hidden');
+      const badge = document.getElementById('role-badge');
+      badge.textContent = 'Role: ' + currentRole;
+      badge.className = 'role-badge role-' + currentRole;
+      if (currentRole === 'god') document.getElementById('filter-bar').innerHTML = '<div class="filter-btn active" onclick="setFilter(\'all\')">All</div><div class="filter-btn" onclick="setFilter(\'god\')">God</div><div class="filter-btn" onclick="setFilter(\'friend\')">Friend</div><div class="filter-btn" onclick="setFilter(\'nothing\')">Public</div>';
+      else if (currentRole === 'friend') document.getElementById('filter-bar').innerHTML = '<div class="filter-btn active" onclick="setFilter(\'all\')">All</div><div class="filter-btn" onclick="setFilter(\'friend\')">Friend</div><div class="filter-btn" onclick="setFilter(\'nothing\')">Public</div>';
+      else document.getElementById('filter-bar').innerHTML = '<div class="filter-btn active" onclick="setFilter(\'all\')">All</div><div class="filter-btn" onclick="setFilter(\'nothing\')">Public</div>';
+      loadPhotos();
+    }
+
+    let currentFilter = 'all';
+    function setFilter(f) {
+      currentFilter = f;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().includes(f)));
+      loadPhotos();
+    }
+
+    // Photos
+    async function uploadPhoto() {
+      const file = document.getElementById('photo-input').files[0];
+      if (!file) return document.getElementById('upload-status').textContent = 'Select a photo first';
+      const caption = document.getElementById('caption-input').value || '';
+      const visibility = document.getElementById('visibility-select').value;
+      const ext = file.name.split('.').pop();
+      const path = currentUser.id + '/' + Date.now() + '.' + ext;
+
+      document.getElementById('upload-status').textContent = 'Uploading...';
+      const { error: uploadError } = await supabase.storage.from('photos').upload(path, file);
+      if (uploadError) return document.getElementById('upload-status').textContent = 'Upload error: ' + uploadError.message;
+
+      const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(path);
+      const { error: dbError } = await supabase.from('photos').insert({
+        url: publicUrl,
+        caption: caption,
+        uploaded_by: currentUser.id,
+        visibility: visibility
+      });
+      if (dbError) return document.getElementById('upload-status').textContent = 'DB error: ' + dbError.message;
+      document.getElementById('upload-status').textContent = 'Uploaded!';
+      document.getElementById('photo-input').value = '';
+      document.getElementById('caption-input').value = '';
+      loadPhotos();
+    }
+
+    async function loadPhotos() {
+      document.getElementById('loading-text').classList.remove('hidden');
+      let query = supabase.from('photos').select('*, profiles!inner(email, role)').order('created_at', { ascending: false });
+      if (currentFilter !== 'all') {
+        query = query.eq('visibility', currentFilter);
+      } else {
+        if (currentRole === 'god') {} // sees all
+        else if (currentRole === 'friend') query = query.in('visibility', ['friend', 'nothing']);
+        else query = query.eq('visibility', 'nothing');
+      }
+      const { data, error } = await query;
+      document.getElementById('loading-text').classList.add('hidden');
+      if (error) return document.getElementById('photo-grid').innerHTML = '<p>Error loading photos</p>';
+      const grid = document.getElementById('photo-grid');
+      if (!data || data.length === 0) return grid.innerHTML = '<p style="text-align:center;color:#666">No photos yet</p>';
+      grid.innerHTML = data.map(p => `
+        <div class="photo-card">
+          <img src="${p.url}" loading="lazy" />
+          <div class="caption">${p.caption || ''}</div>
+          <div class="meta">by ${p.profiles?.email || 'unknown'} · ${p.visibility}</div>
+        </div>
+      `).join('');
+    }
+
+    // Check session on load
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session) loadUser();
+    });
+    loadUser();
+  </script>
+</body>
+</html>
